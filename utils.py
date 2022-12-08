@@ -1,6 +1,12 @@
 import logging
 
 
+FILE_NAME = 'some_file.txt'
+DIR_NAME = 'some dir'
+
+TIME_PATTERN = '%d.%m.%Y %H:%M'
+
+
 def get_logger():
     logger = logging.getLogger('scheduler')
     logging.basicConfig(
