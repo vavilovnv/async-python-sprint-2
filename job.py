@@ -1,7 +1,19 @@
 from datetime import datetime, timedelta
+from multiprocessing import Process
 from typing import Callable
 from uuid import uuid4
-from utils import TIME_PATTERN
+from utils import get_logger, TIME_PATTERN
+
+
+logger = get_logger()
+
+
+def coroutine(f):
+    def wrap(*args, **kwargs):
+        gen = f(*args, **kwargs)
+        gen.send(None)
+        return gen
+    return wrap
 
 
 class Job:
@@ -11,27 +23,44 @@ class Job:
                  max_working_time: int = -1,
                  tries: int = 0,
                  dependencies: list = []):
-        self.task = task()
+        self.task = task
         if start_at:
             self.start_at = datetime.strptime(start_at, TIME_PATTERN)
         else:
             self.start_at = None
-        if max_working_time > 0:
-            self.max_working_time = timedelta(seconds=max_working_time)
-        else:
-            self.max_working_time = None
-        if self.start_at and self.max_working_time:
-            self.finish_at = self.start_at + self.max_working_time
-        elif self.max_working_time:
-            self.finish_at = datetime.now() + self.max_working_time
-        else:
-            self.finish_at = None
+        self.max_working_time = max_working_time
         self.tries = tries
         self.dependencies = dependencies
-        self.id = uuid4()
 
-    def run(self):
-        return next(self.task)
+    @staticmethod
+    @coroutine
+    def run():
+        while True:
+            try:
+                task, start_at, max_working_time, tries = (yield)
+                task_name = task.__name__
+                logger.info('Task "%s" started.', task_name)
+                if max_working_time > 0:
+                    process = Process(target=task)
+                    process.start()
+                    process.join(max_working_time)
+                    if process.is_alive():
+                        process.terminate()
+                        logger.warning('Task "%s" terminated.', task_name)
+                else:
+                    task()
+                    logger.info('Task "%s" finished.', task_name)
+                tries = 0
+            except Exception as error:
+                logger.error(error)
+                while tries:
+                    tries -= 1
+                    logger.warning('Task "%s" restarted.', task_name)
+                    try:
+                        task()
+                        logger.info('Task "%s" successful finished.', task_name)
+                    except Exception as error:
+                        logger.error(error)
 
     def pause(self):
         pass
