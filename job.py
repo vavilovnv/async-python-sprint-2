@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from multiprocessing import Process
 from typing import Callable
-from uuid import uuid4
 from utils import get_logger, TIME_PATTERN
 
 
