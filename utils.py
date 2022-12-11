@@ -12,8 +12,8 @@ TIME_PATTERN = '%d.%m.%Y %H:%M:%S'
 
 future_datetime = datetime.now() + timedelta(seconds=5)
 FUTURE_START_TIME = future_datetime.strftime(TIME_PATTERN)
-DEFAULT_DURATION = 1
-SCHEDULE_DURATION = 10
+DEFAULT_DURATION = 0.3
+SCHEDULE_DURATION = 1
 
 
 def get_logger():

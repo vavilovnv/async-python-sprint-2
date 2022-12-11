@@ -1,6 +1,5 @@
 import threading
 from datetime import datetime
-from threading import Timer
 from uuid import uuid4
 
 from job import Job
@@ -28,15 +27,19 @@ class Scheduler:
             if job.start_at < datetime.now():
                 logger.warning('Tried to add task "%s" to the schedule, but time is expired', task_name)
                 return
-            if job.start_at > datetime.now():
-                seconds = (job.start_at - datetime.now()).total_seconds()
-                timer = Timer(seconds, self.queue.append, (job,))
-                timer.start()
-                self.queue.append(None)
-                logger.warning('Task "%s" added to scheduling at %s', task_name, job.start_at)
-                return
         self.queue.append(job)
-        logger.info('Task "%s" is added to the schedule', task_name)
+        if job.start_at and job.start_at > datetime.now():
+            logger.warning('Task "%s" added to scheduling at %s', task_name, job.start_at)
+        else:
+            logger.info('Task "%s" is added to the schedule', task_name)
+
+    def run(self):
+        logger.info('>>>Starting schedule jobs.')
+        while self.queue:
+            job = self.queue.pop(0)
+            self.job_manager.send(
+                (job.task, job.start_at, job.max_working_time, job.tries)
+            )
 
     def load_jobs_status(self):
         for task in load_jobs_data():
@@ -58,25 +61,3 @@ class Scheduler:
                 break
         if len(data) > 0:
             save_to_file(data)
-
-    def execute_jobs(self, stop_jobs):
-        while not stop_jobs.is_set():
-            job = self.queue.pop(0) if self.queue else None
-            if job:
-                self.job_manager.send(
-                    (job.task, job.start_at, job.max_working_time, job.tries)
-                )
-
-    def run(self):
-        logger.info('Starting schedule jobs.')
-        threading.Thread(target=self.execute_jobs, args=[self.stop_jobs], daemon=True).start()
-
-    def restart(self):
-        self.stop()
-        self.load_jobs_status()
-        self.run()
-
-    def stop(self):
-        logger.info('The scheduler is finished.')
-        self.stop_jobs.set()
-        self.save_jobs_status()

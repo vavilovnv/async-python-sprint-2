@@ -24,7 +24,3 @@ if __name__ == '__main__':
         scheduler.schedule(job)
 
     scheduler.run()
-    time.sleep(SCHEDULE_DURATION)
-    scheduler.restart()
-
-

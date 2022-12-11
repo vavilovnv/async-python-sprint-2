@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from multiprocessing import Process
 from typing import Callable
@@ -30,6 +31,7 @@ class Job:
         self.max_working_time = max_working_time
         self.tries = tries
         self.dependencies = dependencies
+        self.done = False
 
     @staticmethod
     @coroutine
@@ -39,6 +41,9 @@ class Job:
                 task, start_at, max_working_time, tries = (yield)
                 task_name = task.__name__
                 logger.info('Task "%s" started.', task_name)
+                if start_at and start_at > datetime.now():
+                    seconds = (start_at - datetime.now()).total_seconds()
+                    time.sleep(seconds)
                 if max_working_time > 0:
                     process = Process(target=task)
                     process.start()
@@ -50,6 +55,9 @@ class Job:
                     task()
                     logger.info('Task "%s" finished.', task_name)
                 tries = 0
+            except GeneratorExit:
+                logger.info('Finished schedule jobs.')
+                raise
             except Exception as error:
                 logger.error(error)
                 while tries:
