@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
-from multiprocessing import Process
-from typing import Callable
+from threading import Timer, Thread
+from tasks import get_task
 from utils import get_logger, TIME_PATTERN
 
 
@@ -18,12 +18,12 @@ def coroutine(f):
 
 class Job:
     def __init__(self,
-                 task: Callable,
+                 task: str,
                  start_at: str = "",
                  max_working_time: int = -1,
                  tries: int = 0,
                  dependencies: list = []):
-        self.task = task
+        self.task = get_task(task)
         if start_at:
             self.start_at = datetime.strptime(start_at, TIME_PATTERN)
         else:
@@ -31,29 +31,38 @@ class Job:
         self.max_working_time = max_working_time
         self.tries = tries
         self.dependencies = dependencies
-        self.done = False
+        self.thread = []
+
+    @staticmethod
+    def sleep_seconds(seconds):
+        time.sleep(seconds)
+
+    @staticmethod
+    def delay_thread(task, seconds):
+        Job.sleep_seconds(seconds)
+        task()
 
     @staticmethod
     @coroutine
     def run():
         while True:
             try:
-                task, start_at, max_working_time, tries = (yield)
-                task_name = task.__name__
-                logger.info('Task "%s" started.', task_name)
-                if start_at and start_at > datetime.now():
-                    seconds = (start_at - datetime.now()).total_seconds()
-                    time.sleep(seconds)
-                if max_working_time > 0:
-                    process = Process(target=task)
-                    process.start()
-                    process.join(max_working_time)
-                    if process.is_alive():
-                        process.terminate()
-                        logger.warning('Task "%s" terminated.', task_name)
+                # task, start_at, max_working_time, tries = (yield)
+                job = (yield)
+                task_name = job.task.__name__
+                if job.start_at and job.start_at > datetime.now():
+                    logger.info('Task "%s" starts at %s.', task_name, job.start_at)
+                    seconds = (job.start_at - datetime.now()).total_seconds()
+                    timer = Timer(seconds, job.task)
+                    timer.start()
+                    timer.join(job.max_working_time)
+                    job.thread.append(timer)
                 else:
-                    task()
-                    logger.info('Task "%s" finished.', task_name)
+                    logger.info('Task "%s" started.', task_name)
+                    thread = Thread(target=job.task)
+                    thread.start()
+                    thread.join(job.max_working_time)
+                    job.thread.append(thread)
                 tries = 0
             except GeneratorExit:
                 logger.info('Finished schedule jobs.')
@@ -64,7 +73,7 @@ class Job:
                     tries -= 1
                     logger.warning('Task "%s" restarted.', task_name)
                     try:
-                        task()
+                        job.task()
                         logger.info('Task "%s" successful finished.', task_name)
                     except Exception as error:
                         logger.error(error)

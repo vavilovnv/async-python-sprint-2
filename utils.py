@@ -11,7 +11,9 @@ DIR_NAME = 'some dir'
 TIME_PATTERN = '%d.%m.%Y %H:%M:%S'
 
 future_datetime = datetime.now() + timedelta(seconds=5)
-FUTURE_START_TIME = future_datetime.strftime(TIME_PATTERN)
+future_datetime2 = datetime.now() + timedelta(seconds=10)
+DELAY_START_TIME = future_datetime.strftime(TIME_PATTERN)
+DELAY_FINISH_TIME = future_datetime.strftime(TIME_PATTERN)
 DEFAULT_DURATION = 0.3
 SCHEDULE_DURATION = 1
 

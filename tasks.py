@@ -22,10 +22,13 @@ def write_to_file():
 
 def read_from_file():
     time.sleep(DEFAULT_DURATION)
-    with open(SOME_FILE_NAME, 'r', encoding='UTF-8') as f:
-        for line in f.readlines():
-            logger.info(line.strip())
-    logger.info('Finished reading file.')
+    try:
+        with open(SOME_FILE_NAME, 'r', encoding='UTF-8') as f:
+            for line in f.readlines():
+                logger.info(line.strip())
+        logger.info('Finished reading file.')
+    except EnvironmentError as error:
+        logger.error(error)
 
 
 def delete_file():
