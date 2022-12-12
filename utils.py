@@ -41,20 +41,18 @@ def get_job_data(job):
         }
 
 
-def load_jobs_data():
+def load_json():
     try:
         with open(JOBS_FILE_NAME, 'r', encoding='UTF-8') as f:
             try:
-                data = json.load(f).values()
+                return json.load(f)
+
             except ValueError:
-                data = []
+                return dict()
     except EnvironmentError:
-        data = []
-    if data:
-        open(JOBS_FILE_NAME, 'w+')
-    return data
+        return dict()
 
 
-def save_to_file(job_data):
+def save_json(job_data):
     with open(JOBS_FILE_NAME, 'w', encoding='UTF-8') as f:
         json.dump(job_data, f)

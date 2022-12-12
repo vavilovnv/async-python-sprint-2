@@ -1,10 +1,6 @@
-import threading
 from datetime import datetime
-from uuid import uuid4
-
 from job import Job
-from tasks import get_task
-from utils import get_job_data, load_jobs_data, get_logger, save_to_file
+from utils import get_job_data, load_json, get_logger, save_json
 
 
 logger = get_logger()
@@ -14,21 +10,55 @@ class Scheduler:
     def __init__(self, pool_size: int = 10):
         self.pool_size = pool_size
         self.job_manager = Job.run()
-        self.queue, self.jobs_data = [], dict()
-        self.load_jobs_status()
+        self.queue = []
 
-    def schedule(self, job: Job):
-        task_name = job.task.__name__
-        if self.pool_size >= len(self.queue) + 1:
+    @staticmethod
+    def load_from_file():
+        jobs_list, dependencies = [], dict()
+        for key, task in load_json().items():
+            jobs_list.append(
+                Job(
+                    uid=key,
+                    task=task['name'],
+                    start_at=task['start_at'],
+                    max_working_time=task['max_working_time'],
+                    tries=task['tries'],
+                    dependencies=[]
+                )
+            )
+            dependencies[key] = task['dependencies']
+        for job in jobs_list:
+            job.dependencies = list(filter(
+                lambda x: x.uid in dependencies[job.uid],
+                jobs_list))
+        return jobs_list
+
+    @staticmethod
+    def save_to_file(queue):
+        data = dict()
+        for job in queue:
+            job_data = get_job_data(job)
+            for dependency in job.dependencies:
+                if dependency in queue:
+                    job_data['dependencies'].append(dependency.uid)
+            data[job.uid] = job_data
+        if len(data) > 0:
+            save_json(data)
+
+    def schedule(self, job_list: list[Job]):
+        self.queue = self.load_from_file()
+        for job in job_list:
             self.queue.append(job)
+            task_name = job.task.__name__
+            if self.pool_size < len(self.queue):
+                logger.error('Tried to add task "%s" to the schedule, but the queue is full', task_name)
+                continue
             if job.start_at and job.start_at > datetime.now():
                 logger.warning('Task "%s" added to scheduling at %s', task_name, job.start_at)
             else:
                 logger.info('Task "%s" is added to the schedule', task_name)
-        else:
-            logger.error('Tried to add task "%s" to the schedule, but the queue is full', task_name)
 
-    def get_task(self):
+    def get_job(self):
         job = self.queue.pop(0)
         task_name = job.task.__name__
         if job.start_at and job.start_at < datetime.now():
@@ -36,38 +66,17 @@ class Scheduler:
             return
         if job.dependencies:
             for dependency in job.dependencies:
-                if dependency in self.queue or any([th.is_alive() for th in dependency.thread]):
-                    # logger.info('Task "%s" is waiting for dependency %s', task_name, dependency)
+                if dependency in self.queue or dependency.worker and dependency.worker.is_alive():
                     self.queue.append(job)
                     return
         return job
 
     def run(self):
         logger.info('>>>Starting schedule jobs.')
-        while self.queue:
-            job = self.get_task()
+        count_jobs = 0
+        while self.queue and count_jobs < self.pool_size:
+            job = self.get_job()
             if job:
+                count_jobs += 1
                 self.job_manager.send(job)
-                #     (job.task, job.start_at, job.max_working_time, job.tries)
-                # ))
-
-    def load_jobs_status(self):
-        for task in load_jobs_data():
-            self.schedule(
-                Job(get_task(task['name']),
-                    task['start_at'],
-                    task['max_working_time'],
-                    task['tries'],
-                    task['dependencies'])
-            )
-
-    def save_jobs_status(self):
-        data = dict()
-        while len(self.queue) > 0:
-            try:
-                job = self.queue.pop(0)
-                data[uuid4().hex] = get_job_data(job)
-            except (AttributeError, IndexError):
-                break
-        if len(data) > 0:
-            save_to_file(data)
+        self.save_to_file(self.queue)
