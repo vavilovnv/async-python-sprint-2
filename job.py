@@ -1,10 +1,11 @@
 from datetime import datetime
-from threading import Timer, Thread
 from multiprocessing import Process
+from threading import Thread, Timer
+from typing import Generator
 from uuid import uuid4
-from tasks import get_task
-from utils import get_logger, TIME_PATTERN
 
+from tasks import get_task
+from utils.utils import TIME_PATTERN, get_logger
 
 logger = get_logger()
 
@@ -18,6 +19,8 @@ def coroutine(f):
 
 
 class Job:
+    """Класс описывающий задачу планировщика и её методы."""
+
     def __init__(self,
                  task: str,
                  uid: str = '',
@@ -37,13 +40,17 @@ class Job:
         self.worker = None
 
     @staticmethod
-    def execute_job(job, task_name):
+    def __execute_job(job) -> None:
+        """Функция создает процесс или поток в зависимости от параметров
+        задачи и запускает его на исполнение. Возвращает процесс или поток
+        для дальнейшего отслеживания его состояния."""
+
+        task_name = job.task.__name__
         if job.start_at and job.start_at > datetime.now():
             seconds = (job.start_at - datetime.now()).total_seconds()
             logger.info('Task "%s" starts at %s.', task_name, job.start_at)
             worker = Timer(seconds, job.task)
             worker.start()
-            worker.join()
         else:
             logger.info('Task "%s" started.', task_name)
             if job.max_working_time >= 0:
@@ -57,28 +64,31 @@ class Job:
                 worker = Thread(target=job.task)
                 worker.start()
                 worker.join()
-        return worker
+        job.worker = worker
 
     @staticmethod
     @coroutine
-    def run():
+    def run() -> Generator:
+        """Корутина для запуска задач на исполнение."""
+
         while True:
             try:
-                # task, start_at, max_working_time, tries = (yield)
                 job = (yield)
-                task_name = job.task.__name__
-                job.worker = Job.execute_job(job, task_name)
-                tries = 0
+                Job.__execute_job(job)
             except GeneratorExit:
                 logger.info('>>>Finished schedule jobs.')
                 raise
             except Exception as error:
                 logger.error(error)
-                while tries:
-                    tries -= 1
+                while job.tries > 0:
+                    job.tries -= 1
+                    task_name = job.task.__name__
                     logger.warning('Task "%s" restarted.', task_name)
                     try:
-                        job.worker = Job.execute_job(job, task_name)
-                        logger.info('Task "%s" successful finished.', task_name)
+                        Job.__execute_job(job, task_name)
+                        logger.info(
+                            'Task "%s" successful finished.',
+                            task_name
+                        )
                     except Exception as error:
                         logger.error(error)
