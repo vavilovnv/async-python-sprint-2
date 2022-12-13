@@ -85,7 +85,7 @@ class Job:
                     task_name = job.task.__name__
                     logger.warning('Task "%s" restarted.', task_name)
                     try:
-                        Job.__execute_job(job, task_name)
+                        Job.__execute_job(job)
                         logger.info(
                             'Task "%s" successful finished.',
                             task_name
