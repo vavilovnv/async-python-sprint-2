@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     scheduler = Scheduler(pool_size=8)
 
-    #  пример расписания планировщика задач
+    #  пример расписания
     scheduler.schedule([
         delete_file_job,  # задача будет ждать выполнение зависимостей
         read_from_file_job,  # задача будет ждать выполнение зависимостей
@@ -33,4 +33,4 @@ if __name__ == '__main__':
         get_whether
     ])
 
-    scheduler.run()  # можно поместить в бесконечный цикл
+    scheduler.run()
