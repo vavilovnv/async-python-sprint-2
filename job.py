@@ -27,7 +27,7 @@ class Job:
                  start_at: str = '',
                  max_working_time: int = -1,
                  tries: int = 0,
-                 dependencies: list = []):
+                 dependencies: list = None):
         self.task = get_task(task)
         if start_at:
             self.start_at = datetime.strptime(start_at, TIME_PATTERN)
@@ -35,12 +35,12 @@ class Job:
             self.start_at = None
         self.max_working_time = max_working_time
         self.tries = tries
-        self.dependencies = dependencies
+        self.dependencies = dependencies or []
         self.uid = uid if uid else uuid4().hex
         self.worker = None
 
     @staticmethod
-    def __execute_job(job) -> None:
+    def __execute_job(job: 'Job') -> None:
         """Функция создает процесс или поток в зависимости от параметров
         задачи и запускает его на исполнение. Возвращает процесс или поток
         для дальнейшего отслеживания его состояния."""
@@ -68,12 +68,11 @@ class Job:
 
     @staticmethod
     @coroutine
-    def run() -> Generator:
+    def run() -> Generator[None, 'Job', None]:
         """Корутина для запуска задач на исполнение."""
 
-        while True:
+        while job := (yield):
             try:
-                job = (yield)
                 Job.__execute_job(job)
             except GeneratorExit:
                 logger.info('>>>Finished schedule jobs.')

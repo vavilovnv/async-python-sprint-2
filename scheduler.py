@@ -36,9 +36,8 @@ class Scheduler:
             )
             dependencies[key] = task.dependencies
         for job in jobs_list:
-            job.dependencies = list(filter(
-                lambda x: x.uid in dependencies[job.uid],
-                jobs_list))
+            job.dependencies = [j for j in jobs_list
+                                if j.uid in dependencies[job.uid]]
         return jobs_list
 
     @staticmethod
