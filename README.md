@@ -1,3 +1,5 @@
+![example workflow](https://github.com/vavilovnv/async-python-sprint-2/actions/workflows/app-testing.yml/badge.svg)  
+
 # Проектное задание второго спринта
 
 Спроектировать и реализовать планировщик задач для выполнения поступающих задач.
